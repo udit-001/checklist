@@ -1,4 +1,4 @@
-const CACHE = "pg-shortlister-v1";
+const CACHE_NAME = "pg-shortlister-v2";
 
 const ASSETS = [
   "./",
