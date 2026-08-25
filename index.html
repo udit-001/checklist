@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <meta name="description" content="A simple offline PG visit tracker and comparison app.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <title>PG Shortlister</title>
+  <style>
+    :root{--bg:#f5f6f8;--card:#fff;--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#111827;--good:#166534;--bad:#991b1b}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+    header{background:#111827;color:white;padding:18px 16px;position:sticky;top:0;z-index:5}
+    header .bar{max-width:760px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:12px}
+    h1{font-size:20px;margin:0} .sub{font-size:12px;color:#cbd5e1;margin-top:3px}
+    main{max-width:760px;margin:0 auto;padding:16px 12px 40px}
+    .view{display:none}.view.active{display:block}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:10px 0;box-shadow:0 2px 10px #00000008}
+    label{display:block;font-weight:650;font-size:14px;margin:12px 0 6px}
+    input,textarea,select{width:100%;font:inherit;border:1px solid #d1d5db;border-radius:10px;padding:10px;background:white;color:var(--ink)}
+    textarea{min-height:72px;resize:vertical}.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}
+    button{border:0;border-radius:10px;padding:10px 13px;font:inherit;font-weight:650;cursor:pointer;background:var(--accent);color:white}
+    button.secondary{background:#eef0f3;color:#111827} button.danger{background:#fee2e2;color:#991b1b}
+    button.small{padding:7px 10px;font-size:13px}.muted{color:var(--muted);font-size:13px}
+    .top-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+    .checklist h2{font-size:15px;margin:0 0 8px}.check{display:flex;gap:9px;align-items:flex-start;padding:8px 0;border-top:1px solid #f0f1f3}
+    .check input{width:20px;height:20px;margin:0;flex:none}.check label{margin:0;font-weight:500;line-height:1.35}
+    .section-note{margin:6px 0 2px}.score{font-weight:800}
+    .pg-card{cursor:pointer}.pg-head{display:flex;justify-content:space-between;gap:10px}.pg-name{font-weight:750}.pill{font-size:11px;padding:4px 7px;border-radius:999px;background:#f1f5f9}
+    .empty{text-align:center;padding:30px 10px;color:var(--muted)}
+    .sticky-save{position:sticky;bottom:12px;margin-top:14px}
+    .gps{font-size:12px;color:var(--good);margin-top:6px}
+    dialog{border:0;border-radius:16px;padding:0;max-width:92vw;width:520px;box-shadow:0 20px 70px #0005} dialog::backdrop{background:#0006}
+    .dialog-body{padding:18px}.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}
+    @media(min-width:650px){main{padding-top:22px}.card{padding:18px}}
+  </style>
+</head>
+<body>
+<header><div class="bar"><div><h1>PG Shortlister</h1><div class="sub">Visit → record → compare</div></div><button class="small secondary" id="homeBtn">All PGs</button></div></header>
+<main>
+  <section id="home" class="view active">
+    <div class="top-actions"><button id="newBtn">＋ New PG visit</button><button class="secondary" id="installBtn" hidden>Install app</button></div>
+    <div id="pgList"></div>
+  </section>
+
+  <section id="editor" class="view">
+    <div class="top-actions"><button class="secondary small" id="backBtn">← All PGs</button></div>
+    <div class="card">
+      <label for="pgName">PG name *</label>
+      <input id="pgName" placeholder="e.g. Green Nest PG" autocomplete="organization">
+
+      <div class="row">
+        <div><label for="rent">Rent (₹)</label><input id="rent" type="number" inputmode="numeric" placeholder="12000"></div>
+        <div><label for="deposit">Deposit (₹)</label><input id="deposit" type="number" inputmode="numeric" placeholder="25000"></div>
+      </div>
+
+      <label>Location (optional)</label>
+      <div class="row"><button type="button" id="gpsBtn">📍 Record my location</button><button type="button" class="secondary" id="clearGpsBtn">Clear</button></div>
+      <div id="gpsStatus" class="gps"></div>
+
+      <label for="overall">Overall</label>
+      <select id="overall"><option value="">Not decided</option><option>👍 Strong shortlist</option><option>🤔 Maybe</option><option>❌ No</option></select>
+
+      <label for="pros">Top pros</label><textarea id="pros" placeholder="Good location, clean room..."></textarea>
+      <label for="dealbreakers">Dealbreakers / concerns</label><textarea id="dealbreakers" placeholder="Curfew, poor water pressure..."></textarea>
+    </div>
+
+    <div class="card checklist" id="checklist"></div>
+
+    <div class="card">
+      <label for="notes">Other notes</label>
+      <textarea id="notes" placeholder="Anything else worth remembering..."></textarea>
+    </div>
+    <div class="sticky-save"><button style="width:100%" id="saveBtn">Save PG</button></div>
+  </section>
+
+  <section id="compare" class="view">
+    <div class="top-actions"><button class="secondary small" id="compareBack">← All PGs</button></div>
+    <div id="compareContent"></div>
+  </section>
+</main>
+
+<dialog id="confirmDialog"><div class="dialog-body"><h3>Delete this PG?</h3><p class="muted">This removes the saved visit from this device.</p><div class="dialog-actions"><button class="secondary" id="cancelDelete">Cancel</button><button class="danger" id="confirmDelete">Delete</button></div></div></dialog>
+
+<script>
+const sections = {
+"💰 Money & contract":["Monthly rent + what’s included?","Deposit amount?","Deposit refund policy — when/how much refunded?","Any deductions when leaving?","Get deductions/refund terms in writing","Rent agreement or only receipts?","Electricity charges — included or extra? How calculated?","Any other hidden charges?"],
+"📅 Rules & moving":["Earliest moving date?","Notice period before leaving?","Curfew / entry restrictions?","Guests allowed? Parents? Siblings?","Any restrictions on visitors staying overnight?","Room change policy if needed?"],
+"🚿 Water & bathroom":["Cauvery/municipal water, borewell, or both?","Water available 24/7?","Geyser works?","Water pressure okay?","Bathroom clean + ventilation okay?"],
+"⚡ Power & internet":["Power backup? What does it actually cover?","Wi-Fi included?","Run fast.com speed test","Check mobile signal inside room","Enough plug points?","AC/fan/geyser/electricity charges extra?"],
+"🛏️ Room & building":["Ventilation + natural light?","Room size/storage sufficient?","Bed/mattress condition?","Fan/AC works?","Lift?","Clothes drying area — where?","Noise level — road/neighbours/common areas","Check for dampness, mould, leaks, pests"],
+"🧺 Amenities":["Washing machine — free or paid?","Fridge?","Water cooler/filter?","Basic kitchen area?","Cooking actually allowed?","Common areas reasonably clean?","How often are rooms/common areas cleaned?"],
+"🍛 Food":["Ask to see/taste today’s food","What meals are included?","North Indian vs South Indian menu?","Menu changes daily/weekly?","Can you skip meals / get a refund?","Tea/snacks included?"],
+"🔐 Safety":["CCTV — where?","Main gate locks/access control?","Security guard?","Who has keys/access to rooms?","Fire extinguisher / emergency exit?","Entry recorded for residents/guests?"],
+"📍 Location":["Distance to college/work","Walk/transport practical?","Nearby groceries, pharmacy, food","Area feels safe after dark"],
+"⭐ Before leaving":["Take photos/videos of room + facilities","Take a photo of the actual room you’ll get","Note owner/manager contact","Write down rent + deposit + electricity + all extra charges","Don’t rely on verbal promises — get important terms in writing","Would I actually live here? YES / NO"]
+};
+
+let data = JSON.parse(localStorage.getItem("pgShortlister") || "[]");
+let currentId = null, deleteId = null;
+const $ = id => document.getElementById(id);
+function saveData(){localStorage.setItem("pgShortlister", JSON.stringify(data));}
+function show(id){document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));$(id).classList.add("active");window.scrollTo(0,0);}
+function uid(){return crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)+Math.random().toString(36).slice(2);}
+function escapeHtml(s=""){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function completed(pg){return Object.values(pg.checks||{}).filter(Boolean).length;}
+function total(){return Object.values(sections).flat().length;}
+
+function renderHome(){
+  const list=$("pgList");
+  if(!data.length){list.innerHTML='<div class="card empty"><div style="font-size:28px">🏠</div><b>No PGs saved yet</b><p>Visit your first PG and tap “New PG visit”.</p></div>';return;}
+  list.innerHTML = `<div class="top-actions"><button class="secondary" id="compareBtn">Compare all (${data.length})</button></div>` +
+    data.slice().sort((a,b)=>b.updatedAt-a.updatedAt).map(pg=>`
+    <div class="card pg-card" data-id="${pg.id}">
+      <div class="pg-head"><div><div class="pg-name">${escapeHtml(pg.name)}</div><div class="muted">${new Date(pg.updatedAt).toLocaleString()}</div></div><span class="pill">${completed(pg)}/${total()} checked</span></div>
+      <div style="margin-top:9px">${pg.overall ? escapeHtml(pg.overall) : "🤔 Not decided"} ${pg.rent ? " · ₹"+Number(pg.rent).toLocaleString() : ""}</div>
+      ${pg.lat ? `<div class="gps">📍 Location recorded</div>`:""}
+    </div>`).join("");
+  list.querySelectorAll(".pg-card").forEach(el=>el.onclick=()=>editPG(el.dataset.id));
+  $("compareBtn").onclick=renderCompare;
+}
+function buildChecklist(checks={}){
+  let html="";
+  for(const [heading,items] of Object.entries(sections)){
+    html+=`<div class="section-note"><h2>${heading}</h2></div>`;
+    items.forEach((text,i)=>{
+      const key=heading+"|"+i;
+      html+=`<div class="check"><input type="checkbox" id="c_${btoa(unescape(encodeURIComponent(key))).replace(/[^a-zA-Z0-9]/g,'')}" data-key="${escapeHtml(key)}" ${checks[key]?'checked':''}><label>${text}</label></div>`;
+    });
+  }
+  $("checklist").innerHTML=html;
+}
+function newPG(){
+  currentId=null; $("pgName").value=""; $("rent").value=""; $("deposit").value=""; $("overall").value="";
+  $("pros").value=""; $("dealbreakers").value=""; $("notes").value=""; $("gpsStatus").textContent="";
+  buildChecklist({}); show("editor"); $("pgName").focus();
+}
+function editPG(id){
+  const pg=data.find(x=>x.id===id); if(!pg)return;
+  currentId=id; $("pgName").value=pg.name||""; $("rent").value=pg.rent||""; $("deposit").value=pg.deposit||"";
+  $("overall").value=pg.overall||""; $("pros").value=pg.pros||""; $("dealbreakers").value=pg.dealbreakers||""; $("notes").value=pg.notes||"";
+  $("gpsStatus").textContent=pg.lat ? `📍 ${pg.lat.toFixed(5)}, ${pg.lng.toFixed(5)}` : "";
+  buildChecklist(pg.checks||{}); show("editor");
+}
+function collect(){
+  const checks={}; document.querySelectorAll("#checklist input[type=checkbox]").forEach(x=>checks[x.dataset.key]=x.checked);
+  return {name:$("pgName").value.trim(),rent:$("rent").value,deposit:$("deposit").value,overall:$("overall").value,pros:$("pros").value,dealbreakers:$("dealbreakers").value,notes:$("notes").value,checks};
+}
+$("newBtn").onclick=newPG; $("backBtn").onclick=()=>{renderHome();show("home")}; $("homeBtn").onclick=()=>{renderHome();show("home")}; $("compareBack").onclick=()=>{renderHome();show("home")};
+$("saveBtn").onclick=()=>{
+  const pg=collect(); if(!pg.name){alert("Enter the PG name first.");$("pgName").focus();return;}
+  const old=currentId&&data.find(x=>x.id===currentId);
+  const record={...(old||{}),...pg,id:currentId||uid(),updatedAt:Date.now()};
+  if(currentId)data=data.map(x=>x.id===currentId?record:x);else data.push(record);
+  saveData(); renderHome(); show("home");
+};
+$("gpsBtn").onclick=()=>{
+  if(!navigator.geolocation){$("gpsStatus").textContent="Location is not supported by this browser.";return;}
+  $("gpsStatus").textContent="Getting location…";
+  navigator.geolocation.getCurrentPosition(pos=>{
+    $("gpsStatus").textContent=`📍 ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)} (accuracy ~${Math.round(pos.coords.accuracy)}m)`;
+    $("gpsBtn").dataset.lat=pos.coords.latitude; $("gpsBtn").dataset.lng=pos.coords.longitude;
+  },err=>$("gpsStatus").textContent="Couldn’t get location. You can leave it blank.",{enableHighAccuracy:true,timeout:10000});
+};
+$("clearGpsBtn").onclick=()=>{$("gpsStatus").textContent="";delete $("gpsBtn").dataset.lat;delete $("gpsBtn").dataset.lng};
+const oldSave=$("saveBtn").onclick;
+$("saveBtn").onclick=()=>{
+  const pg=collect(); if(!pg.name){alert("Enter the PG name first.");$("pgName").focus();return;}
+  const old=currentId&&data.find(x=>x.id===currentId);
+  const record={...(old||{}),...pg,id:currentId||uid(),updatedAt:Date.now()};
+  const lat=$("gpsBtn").dataset.lat, lng=$("gpsBtn").dataset.lng;
+  if(lat&&lng){record.lat=Number(lat);record.lng=Number(lng)} else if(!old?.lat){record.lat=null;record.lng=null}
+  if(currentId)data=data.map(x=>x.id===currentId?record:x);else data.push(record);
+  saveData(); renderHome(); show("home");
+};
+function renderCompare(){
+  if(!data.length){renderHome();return}
+  $("compareContent").innerHTML=`<div class="card"><h2 style="margin-top:0">Compare PGs</h2><div class="muted">Quick side-by-side snapshot. Tap a PG to edit.</div></div>`+
+  `<div class="card" style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><tr><th style="text-align:left;padding:8px;border-bottom:1px solid #ddd">PG</th><th style="padding:8px;border-bottom:1px solid #ddd">Rent</th><th style="padding:8px;border-bottom:1px solid #ddd">Deposit</th><th style="padding:8px;border-bottom:1px solid #ddd">Checked</th><th style="padding:8px;border-bottom:1px solid #ddd">Decision</th></tr>${data.map(pg=>`<tr><td style="padding:8px;border-bottom:1px solid #eee"><b>${escapeHtml(pg.name)}</b></td><td style="padding:8px;border-bottom:1px solid #eee">₹${pg.rent?Number(pg.rent).toLocaleString():"—"}</td><td style="padding:8px;border-bottom:1px solid #eee">₹${pg.deposit?Number(pg.deposit).toLocaleString():"—"}</td><td style="padding:8px;border-bottom:1px solid #eee">${completed(pg)}/${total()}</td><td style="padding:8px;border-bottom:1px solid #eee">${escapeHtml(pg.overall||"—")}</td></tr>`).join("")}</table></div>`+
+  data.map(pg=>`<div class="card"><div class="pg-head"><b>${escapeHtml(pg.name)}</b><button class="small secondary" onclick="editPG('${pg.id}')">Edit</button></div><p class="muted">${escapeHtml(pg.pros||"No pros recorded.")}</p><p><b>Concerns:</b> ${escapeHtml(pg.dealbreakers||"None recorded.")}</p>${pg.notes?`<p><b>Notes:</b> ${escapeHtml(pg.notes)}</p>`:""}${pg.lat?`<p class="gps">📍 ${pg.lat.toFixed(5)}, ${pg.lng.toFixed(5)}</p>`:""}</div>`).join("");
+  show("compare");
+}
+let deferredPrompt;
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;$("installBtn").hidden=false});
+$("installBtn").onclick=async()=>{if(deferredPrompt){deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;$("installBtn").hidden=true}};
+if("serviceWorker" in navigator) window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js"));
+renderHome();
+</script>
+</body>
+</html>
